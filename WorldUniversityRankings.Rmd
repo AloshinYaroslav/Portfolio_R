@@ -1,0 +1,30 @@
+---
+title: "WorldUniversityRankings"
+author: "Yasko"
+date: "2022-10-21"
+output: html_document
+---
+
+```{r}
+library(knitr)
+library(formattable)
+library(dplyr)
+library(tm)
+library(tidyr)
+library(wordcloud)
+library(ggplot2)
+library(gridExtra)
+library(grid)
+library(plotly)
+library(corrplot)
+library(ggrepel)
+library(treemap)
+library(fmsb)
+library(leaflet)
+library(reshape)
+```
+
+```{r}
+cwurData <- read.csv("")
+```
+
