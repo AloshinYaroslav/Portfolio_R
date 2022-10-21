@@ -25,6 +25,15 @@ library(reshape)
 ```
 
 ```{r}
-cwurData <- read.csv("")
+cwurData <- read.csv("cwurData.csv")
+educationExpenditure <- read.csv("education_expenditure_supplementary_data.csv")
+educationalAttainment <- read.csv("educational_attainment_supplementary_data.csv")
+schoolCountry <- read.csv("school_and_country_table.csv")
+shanghaiData <- read.csv("shanghaiData.csv")
+timesData <- read.csv("timesData.csv")
+```
+
+```{r}
+
 ```
 
