@@ -2,10 +2,15 @@
 title: "WorldUniversityRankings"
 author: "Yasko"
 date: "2022-10-21"
-output: html_document
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+    theme: united
 ---
+## World University Rankings
 
-```{r}
+```{r Libraries, message=FALSE, warning=FALSE, include=FALSE}
 library(knitr)
 library(formattable)
 library(dplyr)
@@ -23,7 +28,7 @@ library(fmsb)
 library(leaflet)
 library(reshape)
 ```
-
+### Open necessary datasets
 ```{r}
 cwurData <- read.csv("cwurData.csv")
 educationExpenditure <- read.csv("education_expenditure_supplementary_data.csv")
@@ -34,6 +39,180 @@ timesData <- read.csv("timesData.csv")
 ```
 
 ```{r}
+knitr::kable(head(cwurData,10), caption = "Central World University Rankings information (first 10 rows)")
+knitr::kable(head(shanghaiData,10),caption="Shanghai Ranking information (first 10 rows)")
+knitr::kable(head(educationalAttainment,10),caption="Education attainment information (first 10 rows)")
+knitr::kable(head(educationExpenditure,10),caption="Education expenditure information (first 10 rows)")
+knitr::kable(head(timesData,10),caption="Times Higher Education World University Rankings data information (first 10 rows)")
+knitr::kable(head(schoolCountry,10),caption="School & country information (first 10 rows)")
+```
 
+```{r}
+glimpse(cwurData)
+```
+### Review and reveal interesting facts
+```{r}
+cwurData %>% group_by(year) %>% 
+  select(year,institution,world_rank) %>% top_n(-5, wt = world_rank) -> cwurTop5
+
+plot_ly(cwurTop5, x = ~year) %>%
+  add_trace(y = cwurTop5$world_rank, name = cwurTop5$institution, showlegend=TRUE, type = 'scatter', mode = 'lines+markers', color= cwurTop5$institution) %>%
+  layout(title="World Ranked Universities by CWUR (2012-2015)",
+         xaxis = list(showticklabels = TRUE, tickangle = 0, tickfont = list(size = 8)),
+         yaxis = list(title = "World rank"),
+         hovermode = 'compare')
+```
+
+```{r}
+cwurPlotYear <- function(nYear) {
+  cwurData %>% filter(year==nYear) %>% top_n(10,-world_rank) %>% 
+  ggplot(aes(x=reorder(institution,-world_rank), y=world_rank)) + geom_bar(stat="identity", aes(fill=reorder(institution,-world_rank)), colour="black") +
+    theme_bw() + coord_flip() +  scale_fill_manual(values=c(rep("lightgreen",7), "#CD7F32", "grey", "gold")) + guides(fill=FALSE) +
+    labs(x="Institution", y="World Rank", 
+        title=paste("Rank in ",nYear), subtitle="(smaller value is better)")
+}
+```
+
+```{r fig.width = 10, fig.height=10, warning=FALSE}
+cwurPlotYear(2012) -> d1
+cwurPlotYear(2013) -> d2
+cwurPlotYear(2014) -> d3
+cwurPlotYear(2015) -> d4
+grid.arrange(d1,d2,d3,d4, ncol=2)
+```
+
+```{r fig.height=20, fig.width=20, message=FALSE, warning=FALSE}
+cwurData %>% group_by(country) %>% summarise(n = length(publications)) %>% top_n(10,n) %>% ungroup() -> c
+cwurData %>% filter(country %in% c$country) %>%
+ggplot(aes(x=country, y=publications, col=country)) + guides(col=FALSE) +
+  geom_boxplot() +  theme_bw() + coord_flip() + 
+  labs(x="Country", y="Rank by publication", 
+      title="Rank by publication", subtitle="Grouped by country, smaller value is better") + theme(text = element_text(size = 20)) -> d1
+cwurData %>% filter(country %in% c$country) %>%
+ggplot(aes(x=country, y=citations, col=country)) + guides(col=FALSE) +
+  geom_boxplot() +  theme_bw() + coord_flip() + 
+  labs(x="Country", y="Rank by citations", 
+      title="Rank by citations", subtitle="Grouped by country, smaller value is better") + theme(text = element_text(size = 20)) -> d2
+cwurData %>% filter(country %in% c$country) %>%
+ggplot(aes(x=country, y=patents, col=country)) + guides(col=FALSE) +
+  geom_boxplot() +  theme_bw() + coord_flip() + 
+  labs(x="Country", y="Rank by patents", 
+      title="Rank by patents", subtitle="Grouped by country, smaller value is better") + theme(text = element_text(size = 20)) -> d3
+cwurData %>% filter(country %in% c$country) %>%
+ggplot(aes(x=country, y=quality_of_education, col=country)) + guides(col=FALSE) +
+  geom_boxplot() +  theme_bw() + coord_flip() + 
+  labs(x="Country", y="Rank by quality of education", 
+      title="Rank by quality of education", subtitle="Grouped by country, smaller value is better") + theme(text = element_text(size = 20)) -> d4
+cwurData %>% filter(country %in% c$country) %>%
+ggplot(aes(x=country, y=alumni_employment, col=country)) + guides(col=FALSE) +
+  geom_boxplot() +  theme_bw() + coord_flip() + 
+  labs(x="Country", y="Rank by alumni employment", 
+      title="Rank by alumni employment", subtitle="Grouped by country, smaller value is better") + theme(text = element_text(size = 20)) -> d5
+cwurData %>% filter(country %in% c$country) %>%
+ggplot(aes(x=country, y=quality_of_faculty, col=country)) + guides(col=FALSE) +
+  geom_boxplot() +  theme_bw() + coord_flip() + 
+  labs(x="Country", y="Rank by quality of faculty", 
+      title="Rank by quality of faculty", subtitle="Grouped by country, smaller value is better") + theme(text = element_text(size = 20)) -> d6
+grid.arrange(d1,d2,d3,d4,d5,d6, ncol=2)
+```
+
+```{r fig.height=10, fig.width=10, message=FALSE, warning=FALSE}
+cwurData %>% group_by(country,year) %>% 
+  summarise(nr = length(world_rank), minw=min(world_rank), maxw=max(world_rank), avgw=round(mean(world_rank),0)) %>%
+  select(country, year, nr, minw, maxw, avgw) %>% ungroup() -> ccwur
+# light grey boundaries
+l <- list(color = toRGB("grey"), width = 0.5)
+ccwur$hover <- with(ccwur, 
+        paste("Country: ", country, '<br>', 
+              "Year: ",year, "<br>",
+              "Universities in top: ", nr, "<br>",
+              "Min rank in top: ", minw, "<br>",
+              "Max rank in top: ", maxw, "<br>",
+              "Mean rank in top: ", avgw,"<br>"
+              ))
+g <- list(
+  showframe = TRUE,
+  showcoastlines = TRUE,
+  projection = list(type = 'orthogonal')
+)
+plot_geo(ccwur, locationmode = 'country names') %>%
+  add_trace(
+    z = ~nr, color = ~nr, colors = 'Spectral', frame = ~year,
+    text = ~hover, locations=~country, marker = list(line = l)
+  ) %>%
+  colorbar(title = 'Number of\nuniversities in top', tickprefix = '') %>%
+  layout(
+    title = with(ccwur, paste('Number of universities in top<br>Source:<a href="http://cwur.org/">Council of World University Ranking</a>')),
+    geo = g
+  )
+```
+## Check Shanghai Data
+```{r}
+shanghaiDataCld = shanghaiData
+shanghaiDataCld$t_score = 
+  0.1 * shanghaiDataCld$alumni + 0.2 * shanghaiDataCld$award + 0.2 * shanghaiDataCld$hici + 
+  0.2 * shanghaiDataCld$ns + 0.2 * shanghaiDataCld$pub + 0.1 * shanghaiDataCld$pcp
+shanghaiDataCld$total_score[is.na(shanghaiDataCld$total_score)] = shanghaiDataCld$t_score[is.na(shanghaiDataCld$total_score)]
+```
+
+```{r}
+shanghaiDataCld = shanghaiDataCld[complete.cases(shanghaiDataCld),]
+```
+
+```{r message=FALSE, warning=FALSE}
+#Fix the duplicate name for University of California-Berkeley
+shanghaiDataCld$university_name[shanghaiDataCld$university_name=="University of California-Berkeley"] <- "University of California, Berkeley"
+shanghaiDataCld %>% group_by(year) %>% 
+  top_n(10, wt = total_score) %>% select(year,university_name,total_score,alumni, award, hici, ns, pub, pcp) %>% ungroup() -> top10univ
+ 
+ #draw with plotly
+ 
+plot_ly(top10univ, x = ~year) %>%
+  add_trace(y = top10univ$total_score, name = top10univ$university_name, showlegend=TRUE, type = 'scatter', mode = 'lines+markers', color= top10univ$university_name) %>%
+  layout(title="Shanghai (ARWU) World Ranks (2005-2015)<br>Best ranked universities based on total score", legend = list(orientation = 'h'),
+         xaxis = list(showticklabels = TRUE, tickangle = 0, tickfont = list(size = 8)),
+         yaxis = list(title = "Total score"),
+         hovermode = 'compare')
+```
+### Shanghai Top Universities by Year
+```{r}
+top10SpiderWebYear <- function(nYear) {
+    top10univ %>% filter(year==nYear) %>% ungroup() -> top10u
+    top10 <- as.data.frame(cbind(top10u[,c(3,4,5,6,7,8,9)]))
+    colnames(top10) <- c("Total Score", "Alumni with Nobel", "Awarded Nobel", "Highly Cited", 
+                         "Nature&Science", "Publications", "PCAP")
+    rownames(top10) <- top10u$university_name
+    rmin <- apply(top10,2,min); rmax <- apply(top10,2,max)
+     rmax <- 100
+     rmin <- 0
+    colors_border=c( "tomato", "blue", "gold", "green", "magenta", 
+                 "yellow", "grey", "lightblue", "brown", "red", "lightgreen", "cyan" )
+    par(mfrow=c(4,3))
+    par(mar=c(1,1,5,1))
+    for(i in 1:nrow(top10)){
+      colorValue<-(col2rgb(as.character(colors_border[i]))%>% as.integer())/255
+      radarchart(rbind(rmax,rmin,top10[i,]),
+         axistype=2 , 
+         pcol=rgb(colorValue[1],colorValue[2],colorValue[3], alpha = 1),
+         pfcol=rgb(colorValue[1],colorValue[2],colorValue[3], alpha = 0.5),
+         plwd=1 , plty=1,cglcol="grey", cglty=1, axislabcol="grey", cglwd=0.5,vlcex=0.7, 
+         title=rownames(top10[i,]))
+    }
+    title(paste0('\nShanghai World University  Rankings top 10 (',nYear,')'),outer=TRUE,col.main='black',cex.main=1.5)
+}
+```
+
+```{r fig.height=20, fig.width=20}
+top10SpiderWebYear(2005)
+top10SpiderWebYear(2006)
+top10SpiderWebYear(2007)
+top10SpiderWebYear(2008)
+top10SpiderWebYear(2009)
+top10SpiderWebYear(2010)
+top10SpiderWebYear(2011)
+top10SpiderWebYear(2012)
+top10SpiderWebYear(2013)
+top10SpiderWebYear(2014)
+top10SpiderWebYear(2015)
 ```
 
