@@ -37,20 +37,44 @@ schoolCountry <- read.csv("school_and_country_table.csv")
 shanghaiData <- read.csv("shanghaiData.csv")
 timesData <- read.csv("timesData.csv")
 ```
+### Getting basic information from tables {.tabset}
 
+#### Central World University Rankings
 ```{r}
 knitr::kable(head(cwurData,10), caption = "Central World University Rankings information (first 10 rows)")
+```
+
+#### Shanghai Rankings
+```{r}
 knitr::kable(head(shanghaiData,10),caption="Shanghai Ranking information (first 10 rows)")
+```
+
+#### Education attainment
+```{r}
 knitr::kable(head(educationalAttainment,10),caption="Education attainment information (first 10 rows)")
+```
+
+#### Education expenditure
+```{r}
 knitr::kable(head(educationExpenditure,10),caption="Education expenditure information (first 10 rows)")
+```
+
+#### Times Education Rankings
+```{r}
 knitr::kable(head(timesData,10),caption="Times Higher Education World University Rankings data information (first 10 rows)")
+```
+
+#### School & Country
+```{r}
 knitr::kable(head(schoolCountry,10),caption="School & country information (first 10 rows)")
 ```
 
+
+### Review and reveal interesting facts
 ```{r}
 glimpse(cwurData)
 ```
-### Review and reveal interesting facts
+
 ```{r}
 cwurData %>% group_by(year) %>% 
   select(year,institution,world_rank) %>% top_n(-5, wt = world_rank) -> cwurTop5
@@ -201,18 +225,324 @@ top10SpiderWebYear <- function(nYear) {
     title(paste0('\nShanghai World University  Rankings top 10 (',nYear,')'),outer=TRUE,col.main='black',cex.main=1.5)
 }
 ```
-
+### Shanghai World University Rankings by Year {.tabset}
+#### 2005
 ```{r fig.height=20, fig.width=20}
 top10SpiderWebYear(2005)
+```
+
+#### 2006
+```{r fig.height=20, fig.width=20}
 top10SpiderWebYear(2006)
+```
+
+#### 2007
+```{r fig.height=20, fig.width=20}
 top10SpiderWebYear(2007)
+```
+
+#### 2008
+```{r fig.height=20, fig.width=20}
 top10SpiderWebYear(2008)
+```
+
+#### 2009
+```{r fig.height=20, fig.width=20}
 top10SpiderWebYear(2009)
+```
+
+#### 2010
+```{r fig.height=20, fig.width=20}
 top10SpiderWebYear(2010)
+```
+
+#### 2011
+```{r fig.height=20, fig.width=20}
 top10SpiderWebYear(2011)
+```
+
+#### 2012
+```{r fig.height=20, fig.width=20}
 top10SpiderWebYear(2012)
+```
+
+#### 2013
+```{r fig.height=20, fig.width=20}
 top10SpiderWebYear(2013)
+```
+
+#### 2014
+```{r fig.height=20, fig.width=20}
 top10SpiderWebYear(2014)
+```
+
+#### 2015
+```{r fig.height=20, fig.width=20}
 top10SpiderWebYear(2015)
 ```
+
+## Rankings by All Countries
+```{r fig.height=20, fig.width=20, message=FALSE, warning=FALSE}
+merge(shanghaiDataCld,schoolCountry, by.x="university_name", by.y="school_name") -> scData
+
+scData %>% group_by(country) %>% summarise(n = length(alumni)) %>% top_n(10,n) %>% ungroup() -> cs
+
+scData %>% filter(country %in% cs$country) %>%
+ggplot(aes(x=country, y=alumni, col=country)) + guides(col=FALSE) +
+  geom_boxplot() +  theme_bw() + coord_flip() + 
+  labs(x="Country", y="Alumni with Nobel (score)", 
+      title="Alumni with Nobel (score)", subtitle="Grouped by country") -> d1
+scData %>% filter(country %in% cs$country) %>%
+ggplot(aes(x=country, y=award, col=country)) + guides(col=FALSE) +
+  geom_boxplot() +  theme_bw() + coord_flip() + 
+  labs(x="Country", y="Nobel awards score", 
+      title="Nobel awards score", subtitle="Grouped by country") -> d2
+scData %>% filter(country %in% cs$country) %>%
+ggplot(aes(x=country, y=hici, col=country)) + guides(col=FALSE) +
+  geom_boxplot() +  theme_bw() + coord_flip() + 
+  labs(x="Country", y="Highly cited score", 
+      title="Highly cited score", subtitle="Grouped by country") -> d3
+scData %>% filter(country %in% cs$country) %>%
+ggplot(aes(x=country, y=ns, col=country)) + guides(col=FALSE) +
+  geom_boxplot() +  theme_bw() + coord_flip() + 
+  labs(x="Country", y="Nature & Science publications score", 
+      title="Nature & Science publications score", subtitle="Grouped by country") -> d4
+scData %>% filter(country %in% cs$country) %>%
+ggplot(aes(x=country, y=pub, col=country)) + guides(col=FALSE) +
+  geom_boxplot() +  theme_bw() + coord_flip() + 
+  labs(x="Country", y="Publications score", 
+      title="Publications score", subtitle="Grouped by country") -> d5
+scData %>% filter(country %in% cs$country) %>%
+ggplot(aes(x=country, y=pcp, col=country)) + guides(col=FALSE) +
+  geom_boxplot() +  theme_bw() + coord_flip() + 
+  labs(x="Country", y="Per capita performance score", 
+      title="Per capita performance score", subtitle="Grouped by country") -> d6
+
+grid.arrange(d1,d2,d3, d4, d5, d6, ncol=2)
+```
+
+```{r fig.height=10, fig.width=10, message=FALSE, warning=FALSE}
+scData %>%  group_by(country, year) %>% 
+summarise(nr = length(total_score), minw=min(total_score), maxw=max(total_score), avgw=round(mean(total_score),0)) %>%
+select(country, year, nr, minw, maxw, avgw) %>% ungroup() -> swur
+# light grey boundaries
+l <- list(color = toRGB("grey"), width = 0.5)
+swur$hover <- with(swur, 
+      paste("Country: ", country, '<br>', 
+            "Year: ",year, "<br>",
+            "Universities: ", nr, "<br>",
+            "Min total score: ", minw, "<br>",
+            "Max total score: ", maxw, "<br>",
+            "Mean total score: ", avgw,"<br>"
+            ))
+# specify map projection/options
+g <- list(
+showframe = TRUE,
+showcoastlines = TRUE,
+projection = list(type = 'Mercator')
+)
+plot_geo(swur, locationmode = 'country names') %>%
+add_trace(
+  z = ~nr, color = ~nr, colors = 'Spectral', frame = ~year,
+  text = ~hover, locations=~country, marker = list(line = l)
+) %>%
+colorbar(title = 'Number of\nuniversities', tickprefix = '') %>%
+layout(
+  title = with(swur, paste('Number of universities<br>Source:<a href="http://www.shanghairanking.com">Shanghai Academic World University Rankings</a>')),
+  geo = g
+)
+```
+## Times Higher Education University Rankings
+```{r}
+#replace first the missing values (`-`) with NA
+timesData$teaching[timesData$teaching=='-'] <- NA
+timesData$international[timesData$international=='-'] <- NA
+timesData$research[timesData$research=='-'] <- NA
+timesData$citations[timesData$citations=='-'] <- NA
+timesData$income[timesData$income=='-'] <- NA
+timesData$total_score[timesData$total_score=='-'] <- NA
+
+#replace factors with numeric
+timesData$teaching <- as.numeric(as.character(timesData$teaching))
+timesData$international <- as.numeric(as.character(timesData$international))
+timesData$research <- as.numeric(as.character(timesData$research))
+timesData$citations <- as.numeric(as.character(timesData$citations))
+timesData$income <- as.numeric(as.character(timesData$income))
+timesData$total_score <- as.numeric(as.character(timesData$total_score))
+
+# replace NAs with 0
+timesData$income[is.na(timesData$income)] <- 0
+timesData$international[is.na(timesData$international)] <- 0
+
+#calculate the total score
+timesData$t_score = 
+  0.3 * as.numeric(as.character(timesData$teaching)) + 
+  0.075 * as.numeric(as.character(timesData$international)) + 
+  0.3 * as.numeric(as.character(timesData$research)) + 
+  0.3 * as.numeric(as.character(timesData$citations)) + 
+  0.025 * as.numeric(as.character(timesData$income))
+  
+#replace the total_score where missing with the calculated value
+timesData$total_score[is.na(timesData$total_score)] <- timesData$t_score[is.na(timesData$total_score)]
+timesData$wr = as.numeric(as.character(timesData$world_rank))
+```
+
+```{r}
+thePlotYear <- function(nYear) {
+  timesData %>% filter(year==nYear) %>% top_n(10,-wr) %>% 
+  ggplot(aes(x=reorder(university_name,-wr), y=wr)) + geom_bar(stat="identity", aes(fill=reorder(university_name,-wr)), colour="black") +
+    theme_bw() + coord_flip() +  scale_fill_manual(values=c(rep("lightgreen",7), "#CD7F32", "grey", "gold")) + guides(fill=FALSE) +
+    labs(x="University name", y="World Rank", 
+        title=paste("Rank in ",nYear), subtitle="(smaller value is better)") 
+}
+```
+
+
+```{r fig.height=20, fig.width=20, message=FALSE, warning=FALSE}
+thePlotYear(2011) -> d1
+thePlotYear(2012) -> d2
+thePlotYear(2013) -> d3
+thePlotYear(2014) -> d4
+thePlotYear(2015) -> d5
+thePlotYear(2016) -> d6
+grid.arrange(d1,d2,d3,d4,d5,d6, ncol=2)
+```
+
+### Ranks by Year {.tabset}
+```{r}
+timesData %>% group_by(year) %>% 
+  top_n(10, wt = total_score) %>% 
+  select(year,university_name,total_score,teaching, international, research, citations, income) %>% ungroup() -> top10univ
+theTop10SpiderWebYear <- function(nYear) {
+    top10univ %>% filter(year==nYear) %>% ungroup() -> top10u
+    top10 <- as.data.frame(cbind(top10u[,c(3,4,5,6,7,8)]))
+    colnames(top10) <- c("Total Score", "Teaching", "International Outlook", "Research", 
+                          "Citations","Industry Income")
+    rownames(top10) <- top10u$university_name
+    
+    rmin <- apply(top10,2,min); rmax <- apply(top10,2,max)
+     rmax <- 100
+     rmin <- 0
+  
+    colors_border=c( "tomato", "blue", "gold", "green", "magenta", 
+                 "yellow", "grey", "lightblue", "brown", "red", "lightgreen", "cyan" )
+
+    par(mfrow=c(4,3))
+    par(mar=c(1,1,5,1))
+    for(i in 1:nrow(top10)){
+      colorValue<-(col2rgb(as.character(colors_border[i]))%>% as.integer())/255
+      radarchart(rbind(rmax,rmin,top10[i,]),
+         axistype=2 , 
+         pcol=rgb(colorValue[1],colorValue[2],colorValue[3], alpha = 1),
+         pfcol=rgb(colorValue[1],colorValue[2],colorValue[3], alpha = 0.5),
+         plwd=1 , plty=1,cglcol="grey", cglty=1, axislabcol="grey", cglwd=0.5,vlcex=0.7, 
+         title=rownames(top10[i,]))
+    }
+    title(paste0('\nTimes Higher Education  World University Rankings top 10 (',nYear,')'),outer=TRUE,col.main='black',cex.main=1.5)
+}
+```
+
+#### 2011
+```{r fig.height=20, fig.width=20}
+theTop10SpiderWebYear(2011)
+```
+
+#### 2012
+```{r fig.height=20, fig.width=20}
+theTop10SpiderWebYear(2012)
+```
+
+#### 2013
+```{r fig.height=20, fig.width=20}
+theTop10SpiderWebYear(2013)
+```
+
+#### 2014
+```{r fig.height=20, fig.width=20}
+theTop10SpiderWebYear(2014)
+```
+
+#### 2015
+```{r fig.height=20, fig.width=20}
+theTop10SpiderWebYear(2015)
+```
+
+#### 2016
+```{r fig.height=20, fig.width=20}
+theTop10SpiderWebYear(2016)
+```
+
+### All countries total scores and counts
+```{r fig.height=20, fig.width=20, message=FALSE, warning=FALSE}
+timesData %>% group_by(country) %>% summarise(n = length(teaching)) %>% top_n(10,n) %>% ungroup() -> ct
+timesData %>% filter(country %in% ct$country) %>%
+ggplot(aes(x=country, y=teaching, col=country)) + guides(col=FALSE) +
+  geom_boxplot() +  theme_bw() + coord_flip() + 
+  labs(x="Country", y="Teaching score", 
+      title="Teaching score", subtitle="Grouped by country") -> d1
+timesData %>% filter(country %in% ct$country) %>%
+ggplot(aes(x=country, y=international, col=country)) + guides(col=FALSE) +
+  geom_boxplot() +  theme_bw() + coord_flip() + 
+  labs(x="Country", y="International outlook score", 
+      title="International outlook score", subtitle="Grouped by country") -> d2
+timesData %>% filter(country %in% ct$country) %>%
+ggplot(aes(x=country, y=research, col=country)) + guides(col=FALSE) +
+  geom_boxplot() +  theme_bw() + coord_flip() + 
+  labs(x="Country", y="Research score", 
+      title="Research score", subtitle="Grouped by country") -> d3
+timesData %>% filter(country %in% ct$country) %>%
+ggplot(aes(x=country, y=citations, col=country)) + guides(col=FALSE) +
+  geom_boxplot() +  theme_bw() + coord_flip() + 
+  labs(x="Country", y="Citations score", 
+      title="Citations score", subtitle="Grouped by country") -> d4
+timesData %>% filter(country %in% ct$country) %>%
+ggplot(aes(x=country, y=income, col=country)) + guides(col=FALSE) +
+  geom_boxplot() +  theme_bw() + coord_flip() + 
+  labs(x="Country", y="Industry income score", 
+      title="Industry income score", subtitle="Grouped by country") -> d5
+timesData %>% filter(country %in% ct$country) %>%
+ggplot(aes(x=country, y=total_score, col=country)) + guides(col=FALSE) +
+  geom_boxplot() +  theme_bw() + coord_flip() + 
+  labs(x="Country", y="Total score", 
+      title="Total score", subtitle="Grouped by country") -> d6
+grid.arrange(d1,d2,d3,d4, d5, d6, ncol=2)
+```
+
+```{r message=FALSE, warning=FALSE}
+timesData$total_score = as.numeric(as.character(timesData$total_score))
+#replace with 0 the missing total_score values - this will affect the aggregated values
+
+timesData %>% group_by(country,year) %>% 
+summarise(nr = length(total_score), minw=min(total_score), maxw=max(total_score), avgw=round(mean(total_score),0)) %>%
+select(country, year, nr, minw, maxw, avgw) %>% ungroup() -> ther
+
+# light grey boundaries
+l <- list(color = toRGB("grey"), width = 0.5)
+
+ther$hover <- with(ther, 
+      paste("Country: ", country, '<br>', 
+            "Year: ",year, "<br>",
+            "Universities: ", nr, "<br>",
+            "Min total score: ", minw, "<br>",
+            "Max total score: ", maxw, "<br>",
+            "Mean total score: ", avgw,"<br>"
+            ))
+# specify map projection/options
+g <- list(
+showframe = TRUE,
+showcoastlines = TRUE,
+projection = list(type = 'Mercator')
+)
+plot_geo(ther, locationmode = 'country names') %>%
+add_trace(
+  z = ~nr, color = ~nr, colors = 'Spectral', frame = ~year,
+  text = ~hover, locations=~country, marker = list(line = l)
+) %>%
+colorbar(title = 'Number of\nuniversities', tickprefix = '') %>%
+layout(
+  title = with(ther, paste('Number of universities<br>Source:<a href="https://www.timeshighereducation.com/world-university-rankings">Times Higher Education World University Ranking</a>')),
+  geo = g
+)
+```
+
 
