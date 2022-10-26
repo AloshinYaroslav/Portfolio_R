@@ -1,0 +1,214 @@
+---
+title: "SongPopularityAnalysis"
+author: "Yasko"
+date: "2022-10-07"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+```{r}
+library(readr)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(formattable)
+library(wordcloud)
+library(RWeka)
+library(qdap)
+library(tm)
+```
+
+```{r}
+spotify_data <- read_csv('featuresdf.csv')
+daily_spotify <- read_csv("data.csv")
+```
+
+```{r}
+glimpse(spotify_data)
+glimpse(daily_spotify)
+```
+
+```{r}
+summary(spotify_data)
+```
+
+```{r}
+spotify_data$duration_ms <- round(spotify_data$duration_ms / 1000)
+colnames(spotify_data)[15] <- "duration"
+summary(spotify_data)
+```
+
+```{r}
+top_artist <- spotify_data %>% group_by(artists) %>% summarise(n_apperance = n()) %>% filter(n_apperance > 1) %>% arrange(desc(n_apperance))
+top_artist$artists <- factor(top_artist$artists, levels = top_artist$artists[order(top_artist$n_apperance)])
+```
+
+```{r}
+ggplot(data = top_artist, aes(x = artists, y = n_apperance)) +
+  geom_bar(stat = "identity", fill = "tomato2", width = 0.6) +
+  labs(title = "Top Artists of 2017", x = "Artists", y = "Number of Apperance on the Top 100") +
+    theme(plot.title = element_text(size=15,hjust=-.3,face = "bold"), axis.title = element_text(size=12)) +
+    geom_text(aes(label=n_apperance), hjust = 2, size = 3, color = 'white') +
+    coord_flip()
+```
+
+```{r}
+us_daily_spotify <- daily_spotify %>% filter(Region == 'us') %>% group_by(`Track Name`) %>% summarise(total_streams = sum(Streams)) %>% arrange(desc(total_streams))
+names(us_daily_spotify)[1] <- paste('name')
+top_by_playtime <- spotify_data %>% left_join(us_daily_spotify, by = "name") %>% select(name, artists, duration, total_streams) %>%
+  mutate(total_time = duration * total_streams / 60000)
+top20_by_playtime <- top_by_playtime %>% group_by(artists) %>% summarise(n_time = sum(total_time)) %>% arrange(desc(n_time)) %>% top_n(20)
+top20_by_playtime$artists <- factor(top20_by_playtime$artists, levels = top20_by_playtime$artists [order(top20_by_playtime$n_time)])
+```
+
+```{r}
+ggplot(top20_by_playtime, aes(x=artists, y=n_time, color=artists)) +
+    geom_point(size=3) + 
+    geom_segment(aes(x=artists,xend=artists, y=0, yend=n_time)) +
+    labs(title = "Top Artists of 2017 in US by Playing time", x='',y='') +
+    theme_bw() +
+    theme(legend.position = 'none', plot.title = element_text(size=17,hjust = -0.7, face = "bold"), axis.title.y = element_text(face = "bold"), axis.title.x = element_text(angle = 120)) +
+    coord_flip()
+```
+
+```{r}
+ed_sheeran_daily <- daily_spotify %>% filter(Region == 'us', Artist == 'Ed Sheeran', Position <= 100)
+formatted_ed <- ed_sheeran_daily %>% group_by(`Track Name`) %>% summarise(n_daily = n()) %>% arrange(desc(n_daily))
+formatted_ed
+```
+
+```{r}
+ed_20 <- ed_sheeran_daily %>% group_by(`Track Name`) %>% summarise(n_daily = n()) %>% filter(n_daily >= 20) %>% select(`Track Name`)
+ed_20 <- ed_20 %>% collect %>% .[["Track Name"]]
+ed_daily_plot <- ed_sheeran_daily %>%
+    filter(`Track Name` %in% ed_20) %>%
+    ggplot(aes(x = Date, y = Position, col = `Track Name`)) + 
+    geom_point(alpha = 0.7, size = 3) +
+    scale_y_reverse(breaks = seq(0,100,10)) +
+    scale_x_date() +
+    ggtitle("Ed Sheeran on Top 100 Daily List in US") +
+    theme_bw() +
+    theme(plot.title = element_text(size = 14, face = "bold")) +
+    theme(legend.title=element_blank())
+
+ed_daily_plot
+```
+
+```{r}
+library(corrplot)
+corrData <- spotify_data[, -(1:3)]
+mtC <- cor(corrData)
+corrplot(mtC, method = "shade", type = "upper", tl.srt = 45)
+```
+
+```{r}
+spotify_data$key <- as.character(spotify_data$key)
+spotify_data$key <- revalue(spotify_data$key, c("0" = "C", "1" = "C♯,D♭", "2" = "D", "3" = "D♯,E♭", "4" = "E", "5" =  "F", "6" = "F♯,G♭","7" = "G","8" = "G♯,A♭","9" = "A","10" = "A♯,B♭","11" = "B"))
+
+song_keys <- spotify_data %>%
+    group_by(key) %>%
+    summarise(n_key = n()) %>%
+    arrange(desc(n_key))
+
+song_keys$key <- factor(song_keys$key, levels = song_keys$key[order(song_keys$n_key)]) # in order to visualise the keys in descending order
+
+ggplot(song_keys, aes(x = reorder(key,-n_key), y = n_key, fill = reorder(key,-n_key))) +
+    geom_bar(stat = "identity") +
+    labs(title = "Distribution of the Keys of Top Songs", x = "Keys", y = "Count of Keys on the Top 100") +
+    geom_text(aes(label=n_key), position = position_stack(vjust = 0.8)) +
+    theme_bw() +
+    theme(plot.title = element_text(size=15,face = "bold"), axis.title = element_text(size=12)) +
+    theme(legend.position="none")
+```
+
+```{r}
+correlated_density <- ggplot(spotify_data) +
+    geom_density(aes(energy, fill ="energy", alpha = 0.1)) + 
+    geom_density(aes(valence, fill ="valence", alpha = 0.1)) + 
+    geom_density(aes(danceability, fill ="danceability", alpha = 0.1)) + 
+    scale_x_continuous(name = "Energy, Valence and Danceability") +
+    scale_y_continuous(name = "Density") +
+    ggtitle("Density plot of Energy, Valence and Danceability") +
+    theme_bw() +
+    theme(plot.title = element_text(size = 14, face = "bold"),
+          text = element_text(size = 12)) +
+    theme(legend.title=element_blank()) +
+    scale_fill_brewer(palette="Accent")
+
+correlated_density
+```
+
+```{r}
+loudness_density <- ggplot(spotify_data) +
+    geom_density(aes(loudness, fill ="loudness")) + 
+    scale_x_continuous(name = "Loudness") +
+    scale_y_continuous(name = "Density") +
+    ggtitle("Density plot of Loudness") +
+    theme_bw() +
+    theme(plot.title = element_text(size = 14, face = "bold"),
+            text = element_text(size = 12)) +
+    theme(legend.title=element_blank()) +
+    scale_fill_brewer(palette="Paired")
+
+print(loudness_density)
+```
+
+```{r}
+library(rpart)
+library(rpart.plot)
+corrData$standing <- c(1:100)
+tree_model <- rpart(standing ~ ., data = corrData)
+rpart.plot(tree_model, box.palette = "GnBu")
+```
+
+```{r}
+qdap_clean <- function(x) { 
+    x <- replace_abbreviation(x) 
+    x <- replace_contraction(x) 
+    x <- replace_number(x) 
+    x <- replace_ordinal(x) 
+    x <- tolower(x) 
+
+    return(x) 
+
+    }
+
+
+
+tm_clean <- function(corpus) {
+    corpus <- tm_map(corpus, content_transformer(strip), char.keep="$")
+    corpus <- tm_map(corpus, stripWhitespace)
+    corpus <- tm_map(corpus, removeWords,
+                     c(stopwords("en"), "with", "feat", "ty"))
+    return(corpus)
+
+}
+tokenizer <- function(x) 
+    NGramTokenizer(x, Weka_control(min = 2, max = 3))
+```
+
+```{r}
+us_top100_titles <- daily_spotify %>%
+    filter(Region == "us", Position <= 100) %>%
+    select(`Track Name`) %>%
+    filter(grepl('feat|with', `Track Name`))
+
+us_top100_titles <- us_top100_titles[!duplicated(us_top100_titles$`Track Name`),]
+us_top100_titles <- qdap_clean(us_top100_titles)
+us_top100_corp <- VCorpus(VectorSource(us_top100_titles))
+us_top100_corp_tm <- tm_clean(us_top100_corp)
+us_top100_tdm <- TermDocumentMatrix(us_top100_corp_tm, control = list(tokenize = tokenizer))
+us_top100_tdm_m <- as.matrix(us_top100_tdm)
+us_top100_freq <- rowSums(us_top100_tdm_m)
+wordcloud(names(us_top100_freq),us_top100_freq, min.freq = 2, max.words = 100, scale = c(3,.3), colors = c("grey80","darkgoldenrod1","tomato"))
+```
+
